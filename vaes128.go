@@ -12,14 +12,14 @@ import (
 // Variable length AES128 key (VAES128K) struct.
 // Do not fill this struct directly.
 // Use set() to ensure correctness.
-type Vaes128_key struct {
+type Key struct {
 	static_iv []byte;
 	static_msgk []byte;
 }
 
 // Set static part of keys to be used for encryption and decryption using VAES128K len=0-16 for both.
 // Random bytes will be prepended to fill full block if len is less than 16.
-func (vaesk *Vaes128_key)Set(static_iv string, static_msgk string) {
+func (vaesk *Key)Set(static_iv string, static_msgk string) {
 	if len(static_iv) > aes.BlockSize {
 		static_iv = static_iv[:aes.BlockSize]
 	}
@@ -32,7 +32,7 @@ func (vaesk *Vaes128_key)Set(static_iv string, static_msgk string) {
 }
 
 // Encrypt buf using VAES128K
-func (vaesk Vaes128_key)Encrypt(buf []byte) ([]byte, error) {
+func (vaesk Key)Encrypt(buf []byte) ([]byte, error) {
 	// Generate full IV and message key
 	riv := make([]byte, aes.BlockSize-len(vaesk.static_iv))
 	rand.Read(riv)
@@ -69,7 +69,7 @@ func (vaesk Vaes128_key)Encrypt(buf []byte) ([]byte, error) {
 }
 
 // Encrypt buf using VAES128K and convert the result to hex string
-func (vaesk Vaes128_key)EncryptHstr(buf []byte) (string, error) {
+func (vaesk Key)EncryptHstr(buf []byte) (string, error) {
 	cipherbuf, err := vaesk.Encrypt(buf)
 	if (err != nil) {
 		return "", err
@@ -79,7 +79,7 @@ func (vaesk Vaes128_key)EncryptHstr(buf []byte) (string, error) {
 }
 
 // Decrypt cipherbuf using VAES128K
-func (vaesk Vaes128_key)Decrypt(cipherbuf []byte) ([]byte, error) {
+func (vaesk Key)Decrypt(cipherbuf []byte) ([]byte, error) {
 	riv_len := aes.BlockSize-len(vaesk.static_iv)
 	rmsgk_len := aes.BlockSize-len(vaesk.static_msgk)
 	padded_len := len(cipherbuf)-riv_len-rmsgk_len
@@ -111,7 +111,7 @@ func (vaesk Vaes128_key)Decrypt(cipherbuf []byte) ([]byte, error) {
 }
 
 // Decrypt hstr using VAES128K
-func (vaesk Vaes128_key)DecryptHstr(hstr string) ([]byte, error) {
+func (vaesk Key)DecryptHstr(hstr string) ([]byte, error) {
 	cipherbuf, err := hex.DecodeString(hstr)
 	if (err != nil) {
 		return nil, err
