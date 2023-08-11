@@ -106,7 +106,11 @@ func (vaesk Key)Decrypt(cipherbuf []byte) ([]byte, error) {
   mode := cipher.NewCBCDecrypter(block, iv)
 	mode.CryptBlocks(buf, cipherbuf)
 	padnum := int(buf[len(buf)-1])
-	buf = buf[:len(buf)-padnum]
+	if len(buf)-padnum >= 0 {
+		buf = buf[:len(buf)-padnum]
+	} else {
+		return []byte{}, fmt.Errorf("VAES128K: Invalid cipher buf")
+	}
 	return buf, nil
 }
 
