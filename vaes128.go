@@ -9,17 +9,15 @@ import (
 	"fmt"
 )
 
-// Variable length AES128 key (VAES128K) struct.
-// Do not fill this struct directly.
-// Use set() to ensure correctness.
+// Variable length AES128 (VAES128) key.
 type Key struct {
 	static_iv   []byte
 	static_msgk []byte
 }
 
-// Set static part of keys to be used for encryption and decryption using VAES128K len=0-16 for both.
+// Set static part of keys to be used for encryption and decryption using VAES128 len=0-16 for both.
 // Random bytes will be prepended to fill full block if len is less than 16.
-func (vaesk *Key) Set(static_iv string, static_msgk string) {
+func (k *Key) Set(static_iv string, static_msgk string) {
 	if len(static_iv) > aes.BlockSize {
 		static_iv = static_iv[:aes.BlockSize]
 	}
@@ -27,19 +25,19 @@ func (vaesk *Key) Set(static_iv string, static_msgk string) {
 		static_msgk = static_msgk[:aes.BlockSize]
 	}
 
-	vaesk.static_iv = []byte(static_iv)
-	vaesk.static_msgk = []byte(static_msgk)
+	k.static_iv = []byte(static_iv)
+	k.static_msgk = []byte(static_msgk)
 }
 
-// Encrypt buf using VAES128K
-func (vaesk Key) Encrypt(buf []byte) ([]byte, error) {
+// Encrypt buf using VAES128
+func (k Key) Encrypt(buf []byte) ([]byte, error) {
 	// Generate full IV and message key
-	riv := make([]byte, aes.BlockSize-len(vaesk.static_iv))
+	riv := make([]byte, aes.BlockSize-len(k.static_iv))
 	rand.Read(riv)
-	iv := append(riv, vaesk.static_iv...)
-	rmsgk := make([]byte, aes.BlockSize-len(vaesk.static_msgk))
+	iv := append(riv, k.static_iv...)
+	rmsgk := make([]byte, aes.BlockSize-len(k.static_msgk))
 	rand.Read(rmsgk)
-	msgk := append(rmsgk, vaesk.static_msgk...)
+	msgk := append(rmsgk, k.static_msgk...)
 
 	// Create cipher and calculate required sizes for ciphertext
 	block, err := aes.NewCipher(msgk)
@@ -68,9 +66,9 @@ func (vaesk Key) Encrypt(buf []byte) ([]byte, error) {
 	return cipherbuf, nil
 }
 
-// Encrypt buf using VAES128K and convert the result to hex string
-func (vaesk Key) EncryptHstr(buf []byte) (string, error) {
-	cipherbuf, err := vaesk.Encrypt(buf)
+// Encrypt buf using VAES128 and convert the result to hex string
+func (k Key) EncryptHstr(buf []byte) (string, error) {
+	cipherbuf, err := k.Encrypt(buf)
 	if err != nil {
 		return "", err
 	}
@@ -78,23 +76,23 @@ func (vaesk Key) EncryptHstr(buf []byte) (string, error) {
 	return hstr, err
 }
 
-// Decrypt cipherbuf using VAES128K
-func (vaesk Key) Decrypt(cipherbuf []byte) ([]byte, error) {
-	riv_len := aes.BlockSize - len(vaesk.static_iv)
-	rmsgk_len := aes.BlockSize - len(vaesk.static_msgk)
+// Decrypt cipherbuf using VAES128
+func (k Key) Decrypt(cipherbuf []byte) ([]byte, error) {
+	riv_len := aes.BlockSize - len(k.static_iv)
+	rmsgk_len := aes.BlockSize - len(k.static_msgk)
 	padded_len := len(cipherbuf) - riv_len - rmsgk_len
 
 	if padded_len%aes.BlockSize != 0 {
-		return nil, fmt.Errorf("VAES128K: Invalid cipher size")
+		return nil, fmt.Errorf("VAES128: Invalid cipher size")
 	}
 
 	// Reconstruct complete IV and message key
 	riv := make([]byte, riv_len)
 	copy(riv, cipherbuf[:riv_len])
-	iv := append(riv, vaesk.static_iv...)
+	iv := append(riv, k.static_iv...)
 	rmsgk := make([]byte, rmsgk_len)
 	copy(rmsgk, cipherbuf[riv_len:riv_len+rmsgk_len])
-	msgk := append(rmsgk, vaesk.static_msgk...)
+	msgk := append(rmsgk, k.static_msgk...)
 
 	// Decrypt the message
 	cipherbuf = cipherbuf[riv_len+rmsgk_len:]
@@ -109,18 +107,18 @@ func (vaesk Key) Decrypt(cipherbuf []byte) ([]byte, error) {
 	if len(buf)-padnum >= 0 {
 		buf = buf[:len(buf)-padnum]
 	} else {
-		return []byte{}, fmt.Errorf("VAES128K: Invalid cipher buf")
+		return []byte{}, fmt.Errorf("VAES128: Invalid cipher buf")
 	}
 	return buf, nil
 }
 
-// Decrypt hstr using VAES128K
-func (vaesk Key) DecryptHstr(hstr string) ([]byte, error) {
+// Decrypt hstr using VAES128
+func (k Key) DecryptHstr(hstr string) ([]byte, error) {
 	cipherbuf, err := hex.DecodeString(hstr)
 	if err != nil {
 		return nil, err
 	}
-	buf, err := vaesk.Decrypt(cipherbuf)
+	buf, err := k.Decrypt(cipherbuf)
 	if err != nil {
 		return nil, err
 	}
