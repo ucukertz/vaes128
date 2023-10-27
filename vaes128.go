@@ -15,7 +15,16 @@ type Key struct {
 	static_msgk []byte
 }
 
-// Set static part of keys to be used for encryption and decryption using VAES128 len=0-16 for both.
+// Create new VAES128 key with the given static parts.
+// Static parts of key are to be used for encryption and decryption using VAES128 (len=0-16 for both).
+// Random bytes will be prepended to fill full block if len is less than 16.
+func New(static_iv string, static_msgk string) Key {
+	var key Key
+	key.Set(static_iv, static_msgk)
+	return key
+}
+
+// Set static parts of key are to be used for encryption and decryption using VAES128 (len=0-16 for both).
 // Random bytes will be prepended to fill full block if len is less than 16.
 func (k *Key) Set(static_iv string, static_msgk string) {
 	if len(static_iv) > aes.BlockSize {
