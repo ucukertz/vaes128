@@ -39,12 +39,12 @@ func (k *Key) Set(static_iv string, static_msgk string) {
 }
 
 // Encrypt buf using VAES128
-func (k Key) Encrypt(buf []byte) ([]byte, error) {
+func (k Key) Encrypt(plain []byte) ([]byte, error) {
 	// Generate full IV and message key
-	riv := make([]byte, aes.BlockSize-len(k.static_iv))
+	riv := make([]byte, aes.BlockSize-len(k.static_iv), aes.BlockSize)
 	rand.Read(riv)
 	iv := append(riv, k.static_iv...)
-	rmsgk := make([]byte, aes.BlockSize-len(k.static_msgk))
+	rmsgk := make([]byte, aes.BlockSize-len(k.static_msgk), aes.BlockSize)
 	rand.Read(rmsgk)
 	msgk := append(rmsgk, k.static_msgk...)
 
@@ -53,81 +53,82 @@ func (k Key) Encrypt(buf []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	blocknum := len(buf)/aes.BlockSize + 1
-	padnum := blocknum*aes.BlockSize - len(buf)
+	blocknum := len(plain)/aes.BlockSize + 1
+	padnum := blocknum*aes.BlockSize - len(plain)
 
 	// Pad the message
 	if padnum == 0 {
 		padnum = aes.BlockSize
 	}
-	padding := make([]byte, padnum)
+	var pnum byte = byte(padnum)
+	padding := make([]byte, pnum)
 	for i := 0; i < padnum; i++ {
-		padding[i] = byte(padnum)
+		padding[i] = pnum
 	}
-	padded := append(buf, padding...)
+	padded := append(plain, padding...)
 
 	// Encrypt and prepend random part of IV and message key
 	cipherbuf := make([]byte, len(padded))
 	mode := cipher.NewCBCEncrypter(block, iv)
 	mode.CryptBlocks(cipherbuf, padded)
-	cipherbuf = append(rmsgk, cipherbuf...)
-	cipherbuf = append(riv, cipherbuf...)
-	return cipherbuf, nil
+	ciph := append(riv, rmsgk...)
+	ciph = append(ciph, cipherbuf...)
+	return ciph, nil
 }
 
 // Encrypt buf using VAES128 and convert the result to hex string
-func (k Key) EncryptHstr(buf []byte) (string, error) {
-	cipherbuf, err := k.Encrypt(buf)
+func (k Key) EncryptHstr(plain []byte) (string, error) {
+	ciph, err := k.Encrypt(plain)
 	if err != nil {
 		return "", err
 	}
-	hstr := hex.EncodeToString(cipherbuf)
+	hstr := hex.EncodeToString(ciph)
 	return hstr, err
 }
 
 // Decrypt cipherbuf using VAES128
-func (k Key) Decrypt(cipherbuf []byte) ([]byte, error) {
+func (k Key) Decrypt(ciph []byte) ([]byte, error) {
 	riv_len := aes.BlockSize - len(k.static_iv)
 	rmsgk_len := aes.BlockSize - len(k.static_msgk)
-	padded_len := len(cipherbuf) - riv_len - rmsgk_len
+	padded_len := len(ciph) - riv_len - rmsgk_len
 
 	if padded_len%aes.BlockSize != 0 {
 		return nil, fmt.Errorf("VAES128: Invalid cipher size")
 	}
 
 	// Reconstruct complete IV and message key
-	riv := make([]byte, riv_len)
-	copy(riv, cipherbuf[:riv_len])
+	riv := make([]byte, riv_len, aes.BlockSize)
+	copy(riv, ciph[:riv_len])
 	iv := append(riv, k.static_iv...)
-	rmsgk := make([]byte, rmsgk_len)
-	copy(rmsgk, cipherbuf[riv_len:riv_len+rmsgk_len])
+	rmsgk := make([]byte, rmsgk_len, aes.BlockSize)
+	copy(rmsgk, ciph[riv_len:riv_len+rmsgk_len])
 	msgk := append(rmsgk, k.static_msgk...)
 
 	// Decrypt the message
-	cipherbuf = cipherbuf[riv_len+rmsgk_len:]
-	buf := make([]byte, len(cipherbuf))
+	ciph = ciph[riv_len+rmsgk_len:]
+	plain := make([]byte, len(ciph))
 	block, err := aes.NewCipher(msgk)
 	if err != nil {
 		return nil, err
 	}
 	mode := cipher.NewCBCDecrypter(block, iv)
-	mode.CryptBlocks(buf, cipherbuf)
-	padnum := int(buf[len(buf)-1])
-	if len(buf)-padnum >= 0 {
-		buf = buf[:len(buf)-padnum]
+	mode.CryptBlocks(plain, ciph)
+	padnum := int(plain[len(plain)-1])
+	if len(plain)-padnum >= 0 {
+		plain = plain[:len(plain)-padnum]
 	} else {
 		return []byte{}, fmt.Errorf("VAES128: Invalid cipher buf")
 	}
-	return buf, nil
+	return plain, nil
 }
 
 // Decrypt hstr using VAES128
 func (k Key) DecryptHstr(hstr string) ([]byte, error) {
-	cipherbuf, err := hex.DecodeString(hstr)
+	ciph, err := hex.DecodeString(hstr)
 	if err != nil {
 		return nil, err
 	}
-	buf, err := k.Decrypt(cipherbuf)
+	buf, err := k.Decrypt(ciph)
 	if err != nil {
 		return nil, err
 	}
